@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import (
+from langchain_text_splitters import (
     CharacterTextSplitter,
 )  # TODO: Use RecursiveTextSplkitter
 from fastapi import UploadFile
