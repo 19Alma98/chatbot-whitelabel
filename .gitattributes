@@ -1,0 +1,4 @@
+# Assicura che i file di script shell abbiano sempre terminazioni di riga Unix (LF)
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+

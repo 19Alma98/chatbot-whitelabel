@@ -7,21 +7,17 @@ from typing import TypedDict
 import fastapi
 from azure.monitor.opentelemetry import configure_azure_monitor
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from fastapi_app.dependencies import (
-    FastAPIAppContext,
-    common_parameters,
-    create_async_sessionmaker,
-    get_azure_credential,
-)
-from fastapi_app.openai_clients import (
-    create_openai_chat_client,
-    create_openai_embed_client,
-)
+from fastapi_app.dependencies import (FastAPIAppContext, common_parameters,
+                                      create_async_sessionmaker,
+                                      get_azure_credential)
+from fastapi_app.openai_clients import (create_openai_chat_client,
+                                        create_openai_embed_client)
 from fastapi_app.postgres_engine import create_postgres_engine_from_env
 
 logger = logging.getLogger("ragapp")
@@ -74,6 +70,18 @@ def create_app(testing: bool = False) -> fastapi.FastAPI:
         OpenAIInstrumentor().instrument()
 
     app = fastapi.FastAPI(docs_url="/docs", lifespan=lifespan)
+
+    # Configurazione CORS
+    # Recupera le origini consentite dalla variabile d'ambiente, altrimenti usa default
+    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", "*").split(",")
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     from fastapi_app.routes import api_routes, frontend_routes
 

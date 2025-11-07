@@ -286,6 +286,9 @@ async def chat_stream_handler(
                 content=json.dumps(ERROR_FILTER) + "\n",
                 media_type="application/x-ndjson",
             )
+        # Re-raise any other exception
+        raise
+    
     return StreamingResponse(
         content=format_as_ndjson(wrapped_result), media_type="application/x-ndjson"
     )
