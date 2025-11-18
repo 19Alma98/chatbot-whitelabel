@@ -31,8 +31,11 @@ class RAGChatBase(ABC):
         response_token_limit = 1024
         prompt_template = overrides.prompt_template or self.answer_prompt_template
 
-        enable_text_search = overrides.retrieval_mode in ["text", "hybrid", None]
-        enable_vector_search = overrides.retrieval_mode in ["vectors", "hybrid", None]
+        enable_text_search = overrides.retrieval_mode in ["text", "hybrid"]
+        enable_vector_search = overrides.retrieval_mode in ["vectors", "hybrid"]
+
+        if not enable_text_search and not enable_vector_search:
+            raise ValueError("At least one of retrieval_mode must be enabled.")
 
         original_user_query = messages[-1]["content"]
         if not isinstance(original_user_query, str):
