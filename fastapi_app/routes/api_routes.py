@@ -20,7 +20,13 @@ from fastapi_app.api_models import (
     RetrievalResponseDelta,
 )
 from fastapi_app.conversation_service import ConversationService
-from fastapi_app.dependencies import ChatClient, CommonDeps, DBSession, VectorDBClient, get_async_sessionmaker
+from fastapi_app.dependencies import (
+    ChatClient,
+    CommonDeps,
+    DBSession,
+    VectorDBClient,
+    get_async_sessionmaker,
+)
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from typing import Annotated
 from fastapi_app.postgres_models import Item
@@ -114,21 +120,27 @@ async def chat_handler(
     try:
         conversation_service = ConversationService(database_session)
         conversation_id = chat_request.conversation_id
-        
+
         all_messages = []
         if conversation_id:
-            history = await conversation_service.get_conversation_history(conversation_id)
+            history = await conversation_service.get_conversation_history(
+                conversation_id
+            )
             all_messages = [
                 {"role": msg.message_role, "content": msg.message_content}
                 for msg in history
             ]
-            logger.info(f"Loaded {len(all_messages)} messages from conversation {conversation_id}")
+            logger.info(
+                f"Loaded {len(all_messages)} messages from conversation {conversation_id}"
+            )
         else:
             conversation_id = ConversationService.generate_conversation_id()
             logger.info(f"Generated new conversation ID: {conversation_id}")
-        
+
         if chat_request.messages:
-            new_user_message = chat_request.messages[-1]  # Get the last message (the new one)
+            new_user_message = chat_request.messages[
+                -1
+            ]  # Get the last message (the new one)
             all_messages.append(new_user_message)
             await conversation_service.save_message(
                 conversation_id=conversation_id,
@@ -152,9 +164,7 @@ async def chat_handler(
                 chat_deployment=context.openai_chat_deployment,
             )
 
-        chat_params = rag_flow.get_params(
-            all_messages, chat_request.context.overrides
-        )
+        chat_params = rag_flow.get_params(all_messages, chat_request.context.overrides)
         contextual_messages, results, thoughts = await rag_flow.prepare_context(
             chat_params
         )
@@ -164,14 +174,14 @@ async def chat_handler(
             results=results,
             earlier_thoughts=thoughts,
         )
-        
+
         # Save the assistant's response
         await conversation_service.save_message(
             conversation_id=conversation_id,
             role="assistant",
             content=response.message.content,
         )
-        
+
         return response
     except Exception as e:
         if isinstance(e, APIError) and e.code == "content_filter":
@@ -187,12 +197,14 @@ async def chat_stream_handler(
     searcher: VectorDBClient,
     chat_request: ChatRequest,
     database_session: DBSession,
-    sessionmaker: Annotated[async_sessionmaker[AsyncSession], Depends(get_async_sessionmaker)],
+    sessionmaker: Annotated[
+        async_sessionmaker[AsyncSession], Depends(get_async_sessionmaker)
+    ],
 ) -> StreamingResponse:
     conversation_service = ConversationService(database_session)
-    
+
     conversation_id = chat_request.conversation_id
-    
+
     # Load existing conversation history if conversation_id is provided
     all_messages = []
     if conversation_id:
@@ -202,17 +214,21 @@ async def chat_stream_handler(
             {"role": msg.message_role, "content": msg.message_content}
             for msg in history
         ]
-        logger.info(f"Loaded {len(all_messages)} messages from conversation {conversation_id}")
+        logger.info(
+            f"Loaded {len(all_messages)} messages from conversation {conversation_id}"
+        )
     else:
         # Generate new conversation ID if not provided
         conversation_id = ConversationService.generate_conversation_id()
         logger.info(f"Generated new conversation ID: {conversation_id}")
-    
+
     # Add only the new user message from the request
     if chat_request.messages:
-        new_user_message = chat_request.messages[-1]  # Get the last message (the new one)
+        new_user_message = chat_request.messages[
+            -1
+        ]  # Get the last message (the new one)
         all_messages.append(new_user_message)
-    
+
     rag_flow: SimpleRAGChat | AdvancedRAGChat
     if chat_request.context.overrides.use_advanced_flow:
         rag_flow = AdvancedRAGChat(
@@ -229,9 +245,7 @@ async def chat_stream_handler(
             chat_deployment=context.openai_chat_deployment,
         )
 
-    chat_params = rag_flow.get_params(
-        all_messages, chat_request.context.overrides
-    )
+    chat_params = rag_flow.get_params(all_messages, chat_request.context.overrides)
 
     # Intentionally do this before we stream down a response, to avoid using database connections during stream
     # See https://github.com/tiangolo/fastapi/discussions/11321
@@ -243,11 +257,11 @@ async def chat_stream_handler(
                 role=new_user_message["role"],
                 content=str(new_user_message["content"]),
             )
-        
+
         contextual_messages, results, thoughts = await rag_flow.prepare_context(
             chat_params
         )
-        
+
         async def save_streamed_response(
             stream: AsyncGenerator[RetrievalResponseDelta, None],
             session_maker: async_sessionmaker[AsyncSession],
@@ -259,7 +273,7 @@ async def chat_stream_handler(
                 if event.delta and event.delta.content:
                     full_response += event.delta.content
                 yield event
-            
+
             # Save the complete assistant response after streaming
             # Create a new session that's independent of the request lifecycle
             if full_response:
@@ -270,7 +284,7 @@ async def chat_stream_handler(
                         role="assistant",
                         content=full_response,
                     )
-        
+
         result = rag_flow.answer_stream(
             chat_params=chat_params,
             contextual_messages=contextual_messages,
@@ -279,7 +293,7 @@ async def chat_stream_handler(
         )
 
         wrapped_result = save_streamed_response(result, sessionmaker, conversation_id)
-        
+
     except Exception as e:
         if isinstance(e, APIError) and e.code == "content_filter":
             return StreamingResponse(
@@ -309,7 +323,9 @@ async def upload_pdf(file: UploadFile = File(...)) -> dict[str, str]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/conversations/{conversation_id}", response_model=ConversationHistoryResponse)
+@router.get(
+    "/conversations/{conversation_id}", response_model=ConversationHistoryResponse
+)
 async def get_conversation_history(
     database_session: DBSession,
     conversation_id: str,
@@ -317,7 +333,7 @@ async def get_conversation_history(
 ) -> ConversationHistoryResponse:
     """
     Retrieve conversation history for a given conversation ID.
-    
+
     Args:
         conversation_id: The ID of the conversation
         limit: Optional limit on the number of messages to retrieve
@@ -327,18 +343,17 @@ async def get_conversation_history(
         conversation_id=conversation_id,
         limit=limit,
     )
-    
+
     if not messages:
         raise HTTPException(
             status_code=404,
             detail=f"No conversation found with ID {conversation_id}",
         )
-    
+
     return ConversationHistoryResponse(
         conversation_id=conversation_id,
         messages=[
-            ConversationMessagePublic.model_validate(msg.to_dict())
-            for msg in messages
+            ConversationMessagePublic.model_validate(msg.to_dict()) for msg in messages
         ],
     )
 
@@ -350,7 +365,7 @@ async def list_conversations(
 ) -> list[dict[str, str]]:
     """
     Get a list of all conversations with their most recent message timestamp.
-    
+
     Args:
         limit: Maximum number of conversations to return (default: 50)
     """
@@ -366,19 +381,19 @@ async def delete_conversation(
 ) -> dict[str, str | int]:
     """
     Delete all messages from a conversation.
-    
+
     Args:
         conversation_id: The ID of the conversation to delete
     """
     conversation_service = ConversationService(database_session)
     deleted_count = await conversation_service.delete_conversation(conversation_id)
-    
+
     if deleted_count == 0:
         raise HTTPException(
             status_code=404,
             detail=f"No conversation found with ID {conversation_id}",
         )
-    
+
     return {
         "message": f"Deleted conversation {conversation_id}",
         "deleted_messages": deleted_count,

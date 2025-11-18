@@ -23,7 +23,12 @@ class ChatUser(HttpUser):
                     }
                 ],
                 "context": {
-                    "overrides": {"use_advanced_flow": True, "top": 3, "retrieval_mode": "hybrid", "temperature": 0.3}
+                    "overrides": {
+                        "use_advanced_flow": True,
+                        "top": 3,
+                        "retrieval_mode": "hybrid",
+                        "temperature": 0.3,
+                    }
                 },
             },
         )
@@ -40,7 +45,12 @@ class ChatUser(HttpUser):
                     {"content": "grazie.", "role": "user"},
                 ],
                 "context": {
-                    "overrides": {"use_advanced_flow": True, "top": 3, "retrieval_mode": "hybrid", "temperature": 0.3}
+                    "overrides": {
+                        "use_advanced_flow": True,
+                        "top": 3,
+                        "retrieval_mode": "hybrid",
+                        "temperature": 0.3,
+                    }
                 },
             },
         )

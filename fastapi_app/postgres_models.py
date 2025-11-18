@@ -44,8 +44,12 @@ class Item(Base):
 
 class ConversationMemory(Base):
     __tablename__ = "conversation_memory"
-    message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    conversation_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, index=True
+    )
     message_role: Mapped[str] = mapped_column(String(50), nullable=False)
     message_content: Mapped[str] = mapped_column(Text, nullable=False)
     message_timestamp: Mapped[datetime] = mapped_column(
@@ -58,7 +62,7 @@ class ConversationMemory(Base):
             "conversation_id": self.conversation_id,
             "message_role": self.message_role,
             "message_content": self.message_content,
-            "message_timestamp": self.message_timestamp.isoformat()
+            "message_timestamp": self.message_timestamp.isoformat(),
         }
 
 

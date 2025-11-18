@@ -75,7 +75,7 @@ class ConversationService:
         for message in messages:
             role = message["role"]
             content = message["content"]
-            
+
             # Handle case where content might be a list (for multimodal messages)
             if isinstance(content, list):
                 # Join all text content parts
@@ -84,7 +84,7 @@ class ConversationService:
                     for part in content
                     if isinstance(part, dict) and "text" in part
                 )
-            
+
             saved_message = ConversationMemory(
                 conversation_id=conversation_id,
                 message_role=str(role),
@@ -96,7 +96,7 @@ class ConversationService:
         await self.db_session.commit()
         for msg in saved_messages:
             await self.db_session.refresh(msg)
-        
+
         logger.info(
             f"Saved {len(saved_messages)} messages to conversation {conversation_id}"
         )
@@ -117,10 +117,12 @@ class ConversationService:
         Returns:
             List of ConversationMemory objects ordered by timestamp (oldest first)
         """
-        query = select(ConversationMemory).where(
-            ConversationMemory.conversation_id == conversation_id
-        ).order_by(ConversationMemory.message_timestamp)
-        
+        query = (
+            select(ConversationMemory)
+            .where(ConversationMemory.conversation_id == conversation_id)
+            .order_by(ConversationMemory.message_timestamp)
+        )
+
         if limit:
             query = query.limit(limit)
 
@@ -175,10 +177,10 @@ class ConversationService:
         """
         messages = await self.get_conversation_history(conversation_id)
         count = len(messages)
-        
+
         for message in messages:
             await self.db_session.delete(message)
-        
+
         await self.db_session.commit()
         logger.info(f"Deleted {count} messages from conversation {conversation_id}")
         return count
@@ -212,13 +214,14 @@ class ConversationService:
         result = await self.db_session.execute(query)
         conversations = []
         for row in result:
-            conversations.append({
-                "conversation_id": row.conversation_id,
-                "last_message_timestamp": row.last_message.isoformat()
-                if row.last_message
-                else None,
-            })
-        
+            conversations.append(
+                {
+                    "conversation_id": row.conversation_id,
+                    "last_message_timestamp": row.last_message.isoformat()
+                    if row.last_message
+                    else None,
+                }
+            )
+
         logger.info(f"Retrieved {len(conversations)} conversations")
         return conversations
-
