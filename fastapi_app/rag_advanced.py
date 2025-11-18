@@ -56,7 +56,7 @@ class AdvancedRAGChat(RAGChatBase):
             few_shots=self.query_fewshots,
             new_user_content=original_user_query,
             past_messages=past_messages,
-            max_tokens=self.chat_token_limit - query_response_token_limit,
+            max_tokens=self.chat_token_limit,
             tools=tools,
             tool_choice=tool_choice,
             fallback_to_default=True,

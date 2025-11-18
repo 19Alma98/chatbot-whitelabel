@@ -13,7 +13,7 @@ def build_search_function() -> list[ChatCompletionToolParam]:
             "type": "function",
             "function": {
                 "name": "search_database",
-                "description": "Search PostgreSQL database for relevant informations based on user query",
+                "description": "Search the knowledge base for relevant information based on user query.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -42,7 +42,7 @@ def extract_search_arguments(
             function = tool.function
             if function.name == "search_database":
                 arg = json.loads(function.arguments)
-                # Even though its required, search_query is not always specified
+                # Even though required, search_query not always specified
                 search_query = arg.get("search_query", original_user_query)
 
     elif query_text := response_message.content:
