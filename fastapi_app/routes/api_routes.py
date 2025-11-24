@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Annotated, Optional
+from typing import Any, Annotated, Callable, Coroutine, Optional
 from fastapi import UploadFile, File, Depends
 
 import fastapi
@@ -36,17 +36,17 @@ from fastapi_app.postgres_models import Item
 from fastapi_app.rag_advanced import AdvancedRAGChat
 from fastapi_app.rag_simple import SimpleRAGChat
 from fastapi_app.pdf_processor import PDFProcessor
+from fastapi_app.postgres_models import User
 
 # Import authentication dependencies
 try:
-    from fastapi_app.auth_dependencies import get_current_user
-    from fastapi_app.postgres_models import User
+    from fastapi_app.auth_dependencies import get_current_user as _get_current_user
 
     AUTH_AVAILABLE = True
+    get_current_user: Callable[[HTTPAuthorizationCredentials, AsyncSession], Coroutine[Any, Any, User]] | None = _get_current_user
 except ImportError:
     AUTH_AVAILABLE = False
-    User = None
-    get_current_user = None
+    get_current_user: Callable[[HTTPAuthorizationCredentials, AsyncSession], Coroutine[Any, Any, User]] | None = None
 
 router = fastapi.APIRouter()
 logger = logging.getLogger("ragapp")
@@ -67,7 +67,7 @@ async def get_optional_user(
         return None
 
     try:
-        if get_current_user:
+        if get_current_user is not None:
             return await get_current_user(credentials, database_session)
     except Exception as e:
         logger.warning(f"Authentication failed: {e}")
@@ -162,7 +162,7 @@ async def chat_handler(
         conversation_id = chat_request.conversation_id
         user_id = current_user.id if current_user else None
 
-        all_messages = []
+        all_messages: list[ChatCompletionMessageParam] = []
         if conversation_id:
             history = await conversation_service.get_conversation_history(
                 conversation_id,
@@ -194,14 +194,14 @@ async def chat_handler(
         rag_flow: SimpleRAGChat | AdvancedRAGChat
         if chat_request.context.overrides.use_advanced_flow:
             rag_flow = AdvancedRAGChat(
-                searcher=searcher,
+                searcher=searcher.searcher,
                 openai_chat_client=openai_chat.client,
                 chat_model=context.openai_chat_model,
                 chat_deployment=context.openai_chat_deployment,
             )
         else:
             rag_flow = SimpleRAGChat(
-                searcher=searcher,
+                searcher=searcher.searcher,
                 openai_chat_client=openai_chat.client,
                 chat_model=context.openai_chat_model,
                 chat_deployment=context.openai_chat_deployment,
@@ -262,7 +262,7 @@ async def chat_stream_handler(
     conversation_id = chat_request.conversation_id
 
     # Load existing conversation history if conversation_id is provided
-    all_messages = []
+    all_messages: list[ChatCompletionMessageParam] = []
     if conversation_id:
         # Get conversation history from database
         history = await conversation_service.get_conversation_history(
@@ -291,14 +291,14 @@ async def chat_stream_handler(
     rag_flow: SimpleRAGChat | AdvancedRAGChat
     if chat_request.context.overrides.use_advanced_flow:
         rag_flow = AdvancedRAGChat(
-            searcher=searcher,
+            searcher=searcher.searcher,
             openai_chat_client=openai_chat.client,
             chat_model=context.openai_chat_model,
             chat_deployment=context.openai_chat_deployment,
         )
     else:
         rag_flow = SimpleRAGChat(
-            searcher=searcher,
+            searcher=searcher.searcher,
             openai_chat_client=openai_chat.client,
             chat_model=context.openai_chat_model,
             chat_deployment=context.openai_chat_deployment,

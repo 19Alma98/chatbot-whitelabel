@@ -207,7 +207,7 @@ async def get_openai_embed_client(
 
 async def get_searcher(
     request: Request, db_session: Annotated[AsyncSession, Depends(get_async_db_session)]
-) -> SearcherProtocol:
+) -> SearcherClient:
     """
     Factory function to create the appropriate searcher based on VECTOR_STORE env variable.
 
@@ -245,32 +245,36 @@ async def get_searcher(
                 credential=azure_credential,
             )
 
-        return cast(
-            SearcherProtocol,
-            AzureAISearchSearcher(
-                search_client=search_client,
-                openai_embed_client=embed_client,
-                embed_deployment=context.openai_embed_deployment,
-                embed_model=context.openai_embed_model,
-                embed_dimensions=context.openai_embed_dimensions,
-                embedding_field="text_vector",  # Default field name for Azure AI Search. TODO: Make this configurable.
-            ),
+        return SearcherClient(
+            searcher=cast(
+                SearcherProtocol,
+                AzureAISearchSearcher(
+                    search_client=search_client,
+                    openai_embed_client=embed_client,
+                    embed_deployment=context.openai_embed_deployment,
+                    embed_model=context.openai_embed_model,
+                    embed_dimensions=context.openai_embed_dimensions,
+                    embedding_field="text_vector",  # Default field name for Azure AI Search. TODO: Make this configurable.
+                ),
+            )
         )
 
     elif context.vector_store == "PGVECTOR":
         if db_session is None:
             raise ValueError("Database session is required for PGVECTOR")
 
-        return cast(
-            SearcherProtocol,
-            PostgresSearcher(
-                db_session=db_session,
-                openai_embed_client=embed_client.client,
-                embed_deployment=context.openai_embed_deployment,
-                embed_model=context.openai_embed_model,
-                embed_dimensions=context.openai_embed_dimensions,
-                embedding_column=context.embedding_column,
-            ),
+        return SearcherClient(
+            searcher=cast(
+                SearcherProtocol,
+                PostgresSearcher(
+                    db_session=db_session,
+                    openai_embed_client=embed_client.client,
+                    embed_deployment=context.openai_embed_deployment,
+                    embed_model=context.openai_embed_model,
+                    embed_dimensions=context.openai_embed_dimensions,
+                    embedding_column=context.embedding_column,
+                ),
+            )
         )
 
     else:

@@ -43,7 +43,7 @@ class User(Base):
         nullable=False,
     )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert user to dictionary, excluding sensitive data."""
         return {
             "id": str(self.id),

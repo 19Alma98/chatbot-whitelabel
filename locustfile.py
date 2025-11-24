@@ -8,7 +8,7 @@ class ChatUser(HttpUser):
     wait_time = between(5, 20)
 
     @task
-    def ask_question(self):
+    def ask_question(self) -> None:
         self.client.get("/")
         time.sleep(5)
         self.client.post(
