@@ -31,8 +31,7 @@ from fastapi_app.dependencies import (
 )
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from fastapi_app.postgres_models import Item
-from fastapi_app.rag_advanced import AdvancedRAGChat
-from fastapi_app.rag_simple import SimpleRAGChat
+from fastapi_app.rag_advanced_langgraph import AdvancedRAGChatLangGraph
 from fastapi_app.pdf_processor import PDFProcessor
 
 router = fastapi.APIRouter()
@@ -149,21 +148,17 @@ async def chat_handler(
                 content=str(new_user_message["content"]),
             )
 
-        rag_flow: SimpleRAGChat | AdvancedRAGChat
-        if chat_request.context.overrides.use_advanced_flow:
-            rag_flow = AdvancedRAGChat(
-                searcher=searcher,
-                openai_chat_client=openai_chat.client,
-                chat_model=context.openai_chat_model,
-                chat_deployment=context.openai_chat_deployment,
-            )
-        else:
-            rag_flow = SimpleRAGChat(
-                searcher=searcher,
-                openai_chat_client=openai_chat.client,
-                chat_model=context.openai_chat_model,
-                chat_deployment=context.openai_chat_deployment,
-            )
+        use_advanced = chat_request.context.overrides.use_advanced_flow
+        logger.info(
+            f"Using LangGraph RAG implementation (mode: {'advanced' if use_advanced else 'simple'})"
+        )
+        rag_flow = AdvancedRAGChatLangGraph(
+            searcher=searcher,
+            openai_chat_client=openai_chat.client,
+            chat_model=context.openai_chat_model,
+            chat_deployment=context.openai_chat_deployment,
+            use_advanced_flow=use_advanced,
+        )
 
         chat_params = rag_flow.get_params(all_messages, chat_request.context.overrides)
         contextual_messages, results, thoughts = await rag_flow.prepare_context(
@@ -240,21 +235,17 @@ async def chat_stream_handler(
         ]  # Get the last message (the new one)
         all_messages.append(new_user_message)
 
-    rag_flow: SimpleRAGChat | AdvancedRAGChat
-    if chat_request.context.overrides.use_advanced_flow:
-        rag_flow = AdvancedRAGChat(
-            searcher=searcher,
-            openai_chat_client=openai_chat.client,
-            chat_model=context.openai_chat_model,
-            chat_deployment=context.openai_chat_deployment,
-        )
-    else:
-        rag_flow = SimpleRAGChat(
-            searcher=searcher,
-            openai_chat_client=openai_chat.client,
-            chat_model=context.openai_chat_model,
-            chat_deployment=context.openai_chat_deployment,
-        )
+    use_advanced = chat_request.context.overrides.use_advanced_flow
+    logger.info(
+        f"Using LangGraph RAG implementation (mode: {'advanced' if use_advanced else 'simple'})"
+    )
+    rag_flow = AdvancedRAGChatLangGraph(
+        searcher=searcher,
+        openai_chat_client=openai_chat.client,
+        chat_model=context.openai_chat_model,
+        chat_deployment=context.openai_chat_deployment,
+        use_advanced_flow=use_advanced,
+    )
 
     chat_params = rag_flow.get_params(all_messages, chat_request.context.overrides)
 

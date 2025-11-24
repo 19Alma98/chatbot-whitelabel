@@ -23,9 +23,11 @@ This project is designed for deployment to Azure using [the Azure Developer CLI]
 
 This project provides the following features:
 
+* **LangGraph-based RAG Agent** - Advanced RAG workflow built with LangGraph for better observability, extensibility, and state management ([Quick Start](docs/LANGGRAPH_QUICKSTART.md) | [Full Documentation](docs/LANGGRAPH_INTEGRATION.md))
 * Hybrid search on the PostgreSQL database table, using [the pgvector extension](https://github.com/pgvector/pgvector) for the vector search plus [full text search](https://www.postgresql.org/docs/current/textsearch-intro.html), combining the results using RRF (Reciprocal Rank Fusion).
 * OpenAI function calling to optionally convert user queries into query filter conditions, such as turning "Climbing gear cheaper than $30?" into "WHERE price < 30".
 * Conversion of user queries into vectors using the OpenAI embedding API.
+* Dual RAG implementations: Simple (direct) and Advanced (with query rewriting), both supporting LangGraph.
 
 ![Screenshot of chat app with question about climbing gear](docs/images/screenshot_chat.png)
 
