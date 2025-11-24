@@ -3,6 +3,7 @@ import os
 
 import azure.identity
 import openai
+from langsmith import wrappers
 
 logger = logging.getLogger("ragapp")
 
@@ -56,6 +57,10 @@ async def create_openai_chat_client(
         )
         openai_chat_client = openai.AsyncOpenAI(api_key=os.getenv("OPENAICOM_KEY"))
 
+    if os.getenv("LANGSMITH_API_KEY"):
+        openai_chat_client = wrappers.wrap_openai(openai_chat_client)
+        logger.info("Wrapped chat client with LangSmith tracing")
+
     return openai_chat_client
 
 
@@ -107,4 +112,9 @@ async def create_openai_embed_client(
     else:
         logger.info("Setting up OpenAI client for embeddings using OpenAI.com API key")
         openai_embed_client = openai.AsyncOpenAI(api_key=os.getenv("OPENAICOM_KEY"))
+
+    if os.getenv("LANGSMITH_API_KEY"):
+        openai_embed_client = wrappers.wrap_openai(openai_embed_client)
+        logger.info("Wrapped embed client with LangSmith tracing")
+
     return openai_embed_client

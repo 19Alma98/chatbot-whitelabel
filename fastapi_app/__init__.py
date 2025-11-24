@@ -27,6 +27,31 @@ from fastapi_app.postgres_engine import create_postgres_engine_from_env
 logger = logging.getLogger("ragapp")
 
 
+def configure_langsmith() -> None:
+    """Configure LangSmith tracing if environment variables are set."""
+    langsmith_api_key = os.getenv("LANGSMITH_API_KEY")
+    langsmith_project = os.getenv("LANGSMITH_PROJECT")
+    langsmith_workspace_id = os.getenv("LANGSMITH_WORKSPACE_ID")
+
+    if langsmith_api_key:
+        # Set tracing environment variables
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
+
+        # Set workspace ID if provided (required for org-scoped API keys)
+        if langsmith_workspace_id:
+            os.environ["LANGSMITH_WORKSPACE_ID"] = langsmith_workspace_id
+            logger.info(f"LangSmith workspace ID set: {langsmith_workspace_id}")
+
+        if langsmith_project:
+            os.environ["LANGCHAIN_PROJECT"] = langsmith_project
+            logger.info(f"LangSmith tracing enabled for project: {langsmith_project}")
+        else:
+            logger.info("LangSmith tracing enabled with default project")
+    else:
+        logger.info("LangSmith tracing not configured (LANGSMITH_API_KEY not set)")
+
+
 class State(TypedDict):
     sessionmaker: async_sessionmaker[AsyncSession]
     context: FastAPIAppContext
@@ -66,6 +91,9 @@ def create_app(testing: bool = False) -> fastapi.FastAPI:
         logging.WARNING
     )
     logging.getLogger("azure.identity").setLevel(logging.WARNING)
+
+    # Configure LangSmith tracing
+    configure_langsmith()
 
     if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         logger.info("Configuring Azure Monitor")

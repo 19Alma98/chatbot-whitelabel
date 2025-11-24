@@ -207,6 +207,7 @@ Further documentation is available in the `docs/` folder:
 * [Deploying with existing resources](docs/deploy_existing.md)
 * [Using Entra auth with PostgreSQL tools](docs/using_entra_auth.md)
 * [Monitoring with Azure Monitor](docs/monitoring.md)
+* [LangSmith Integration for LLM Tracing](docs/langsmith_setup.md)
 * [Load testing](docs/loadtesting.md)
 * [Quality evaluation](docs/evaluation.md)
 * [Safety evaluation](docs/safety_evaluation.md)
