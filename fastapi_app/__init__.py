@@ -105,6 +105,14 @@ def create_app(testing: bool = False) -> fastapi.FastAPI:
 
     from fastapi_app.routes import api_routes, frontend_routes
 
+    try:
+        from fastapi_app.routes import auth_routes
+
+        app.include_router(auth_routes.router)
+        logger.info("Authentication routes enabled")
+    except ImportError:
+        logger.info("Authentication routes not available")
+
     app.include_router(api_routes.router)
     app.mount("/", frontend_routes.router)
 

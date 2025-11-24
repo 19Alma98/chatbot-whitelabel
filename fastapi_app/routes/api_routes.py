@@ -1,12 +1,14 @@
 import json
 import logging
+import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Annotated
+from typing import Any, Annotated, Optional
 from fastapi import UploadFile, File, Depends
 
 import fastapi
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from openai import APIError
 from openai.types.chat import ChatCompletionMessageParam
 from sqlalchemy import select, text
@@ -35,8 +37,44 @@ from fastapi_app.rag_advanced import AdvancedRAGChat
 from fastapi_app.rag_simple import SimpleRAGChat
 from fastapi_app.pdf_processor import PDFProcessor
 
+# Import authentication dependencies
+try:
+    from fastapi_app.auth_dependencies import get_current_user
+    from fastapi_app.postgres_models import User
+
+    AUTH_AVAILABLE = True
+except ImportError:
+    AUTH_AVAILABLE = False
+    User = None
+    get_current_user = None
+
 router = fastapi.APIRouter()
 logger = logging.getLogger("ragapp")
+
+# Optional authentication - allows requests with or without auth token
+security = HTTPBearer(auto_error=False)
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    database_session: DBSession = Depends(),
+) -> Optional[User]:
+    """
+    Optional authentication dependency.
+    Returns user if valid token is provided, None otherwise.
+    """
+    if not AUTH_AVAILABLE or not credentials:
+        return None
+
+    try:
+        if get_current_user:
+            return await get_current_user(credentials, database_session)
+    except Exception as e:
+        logger.warning(f"Authentication failed: {e}")
+        return None
+
+    return None
+
 
 ERROR_FILTER = {
     "error": "Your message contains content that was flagged by the content filter."
@@ -117,15 +155,18 @@ async def chat_handler(
     searcher: VectorDBClient,
     chat_request: ChatRequest,
     database_session: DBSession,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> RetrievalResponse | ErrorResponse:
     try:
         conversation_service = ConversationService(database_session)
         conversation_id = chat_request.conversation_id
+        user_id = current_user.id if current_user else None
 
         all_messages = []
         if conversation_id:
             history = await conversation_service.get_conversation_history(
-                conversation_id
+                conversation_id,
+                user_id=user_id,
             )
             all_messages = [
                 {"role": msg.message_role, "content": msg.message_content}
@@ -147,6 +188,7 @@ async def chat_handler(
                 conversation_id=conversation_id,
                 role=new_user_message["role"],
                 content=str(new_user_message["content"]),
+                user_id=user_id,
             )
 
         rag_flow: SimpleRAGChat | AdvancedRAGChat
@@ -187,6 +229,7 @@ async def chat_handler(
             conversation_id=conversation_id,
             role="assistant",
             content=response.message.content,
+            user_id=user_id,
             chat_params=chat_params_dict,
             contextual_messages=contextual_messages,
             document_ids=document_ids,
@@ -211,8 +254,10 @@ async def chat_stream_handler(
     sessionmaker: Annotated[
         async_sessionmaker[AsyncSession], Depends(get_async_sessionmaker)
     ],
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> StreamingResponse:
     conversation_service = ConversationService(database_session)
+    user_id = current_user.id if current_user else None
 
     conversation_id = chat_request.conversation_id
 
@@ -220,7 +265,10 @@ async def chat_stream_handler(
     all_messages = []
     if conversation_id:
         # Get conversation history from database
-        history = await conversation_service.get_conversation_history(conversation_id)
+        history = await conversation_service.get_conversation_history(
+            conversation_id,
+            user_id=user_id,
+        )
         all_messages = [
             {"role": msg.message_role, "content": msg.message_content}
             for msg in history
@@ -267,6 +315,7 @@ async def chat_stream_handler(
                 conversation_id=conversation_id,
                 role=new_user_message["role"],
                 content=str(new_user_message["content"]),
+                user_id=user_id,
             )
 
         contextual_messages, results, thoughts = await rag_flow.prepare_context(
@@ -280,6 +329,7 @@ async def chat_stream_handler(
             stream: AsyncGenerator[RetrievalResponseDelta, None],
             session_maker: async_sessionmaker[AsyncSession],
             conv_id: str,
+            user_id_to_save: Optional[uuid.UUID],
             chat_params: dict[str, Any],
             contextual_messages_data: list[ChatCompletionMessageParam],
             document_ids_data: list[str],
@@ -301,6 +351,7 @@ async def chat_stream_handler(
                         conversation_id=conv_id,
                         role="assistant",
                         content=full_response,
+                        user_id=user_id_to_save,
                         chat_params=chat_params,
                         contextual_messages=contextual_messages_data,
                         document_ids=document_ids_data,
@@ -318,6 +369,7 @@ async def chat_stream_handler(
             result,
             sessionmaker,
             conversation_id,
+            user_id,
             chat_params.model_dump(),
             contextual_messages,
             document_ids,
@@ -360,6 +412,7 @@ async def get_conversation_history(
     database_session: DBSession,
     conversation_id: str,
     limit: int | None = None,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> ConversationHistoryResponse:
     """
     Retrieve conversation history for a given conversation ID.
@@ -369,9 +422,11 @@ async def get_conversation_history(
         limit: Optional limit on the number of messages to retrieve
     """
     conversation_service = ConversationService(database_session)
+    user_id = current_user.id if current_user else None
     messages = await conversation_service.get_conversation_history(
         conversation_id=conversation_id,
         limit=limit,
+        user_id=user_id,
     )
 
     if not messages:
@@ -392,6 +447,7 @@ async def get_conversation_history(
 async def list_conversations(
     database_session: DBSession,
     limit: int = 50,
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> list[dict[str, str]]:
     """
     Get a list of all conversations with their most recent message timestamp.
@@ -400,7 +456,11 @@ async def list_conversations(
         limit: Maximum number of conversations to return (default: 50)
     """
     conversation_service = ConversationService(database_session)
-    conversations = await conversation_service.get_conversation_list(limit=limit)
+    user_id = current_user.id if current_user else None
+    conversations = await conversation_service.get_conversation_list(
+        limit=limit,
+        user_id=user_id,
+    )
     return conversations
 
 

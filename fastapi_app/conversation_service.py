@@ -28,6 +28,7 @@ class ConversationService:
         conversation_id: str,
         role: str,
         content: str,
+        user_id: Optional[uuid.UUID] = None,
         timestamp: datetime = datetime.now(timezone.utc),
         chat_params: Optional[dict[str, Any]] = None,
         contextual_messages: Optional[list[ChatCompletionMessageParam]] = None,
@@ -41,6 +42,7 @@ class ConversationService:
             conversation_id: The ID of the conversation
             role: The role of the message sender (user, assistant, system)
             content: The content of the message
+            user_id: Optional user ID for authenticated conversations
             timestamp: Optional timestamp for the message (defaults to current time)
             chat_params: Optional debug data for chat parameters
             contextual_messages: Optional debug data for contextual messages
@@ -52,6 +54,7 @@ class ConversationService:
         """
         message = ConversationMemory(
             conversation_id=conversation_id,
+            user_id=user_id,
             message_role=role,
             message_content=content,
             message_timestamp=timestamp,
@@ -118,6 +121,7 @@ class ConversationService:
         self,
         conversation_id: str,
         limit: Optional[int] = None,
+        user_id: Optional[uuid.UUID] = None,
     ) -> list[ConversationMemory]:
         """
         Retrieve conversation history for a given conversation ID.
@@ -125,6 +129,7 @@ class ConversationService:
         Args:
             conversation_id: The ID of the conversation
             limit: Optional limit on the number of messages to retrieve
+            user_id: Optional user ID to filter conversations by owner
 
         Returns:
             List of ConversationMemory objects ordered by timestamp (oldest first)
@@ -134,6 +139,12 @@ class ConversationService:
             .where(ConversationMemory.conversation_id == conversation_id)
             .order_by(ConversationMemory.message_timestamp)
         )
+
+        if user_id:
+            query = query.where(
+                (ConversationMemory.user_id == user_id)
+                | (ConversationMemory.user_id.is_(None))
+            )
 
         if limit:
             query = query.limit(limit)
@@ -200,12 +211,14 @@ class ConversationService:
     async def get_conversation_list(
         self,
         limit: int = 50,
+        user_id: Optional[uuid.UUID] = None,
     ) -> list[dict[str, str]]:
         """
         Get a list of unique conversation IDs with their most recent message timestamp.
 
         Args:
             limit: Maximum number of conversations to return
+            user_id: Optional user ID to filter conversations by owner
 
         Returns:
             List of dictionaries with conversation_id and last_message_timestamp
@@ -222,6 +235,12 @@ class ConversationService:
             .order_by(desc("last_message"))
             .limit(limit)
         )
+
+        if user_id:
+            query = query.where(
+                (ConversationMemory.user_id == user_id)
+                | (ConversationMemory.user_id.is_(None))
+            )
 
         result = await self.db_session.execute(query)
         conversations = []
