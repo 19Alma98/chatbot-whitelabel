@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Any
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Index, String, Text, DateTime
+from sqlalchemy import Index, String, Text, DateTime, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 
 # Define the models
@@ -55,6 +55,13 @@ class ConversationMemory(Base):
     message_timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+    # Debug columns for RAG flow data
+    chat_params: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    contextual_messages: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    document_ids: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    thoughts: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +70,10 @@ class ConversationMemory(Base):
             "message_role": self.message_role,
             "message_content": self.message_content,
             "message_timestamp": self.message_timestamp.isoformat(),
+            "chat_params": self.chat_params,
+            "contextual_messages": self.contextual_messages,
+            "document_ids": self.document_ids,
+            "thoughts": self.thoughts,
         }
 
 

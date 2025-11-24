@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from openai.types.chat import ChatCompletionMessageParam
 from sqlalchemy import select, desc
@@ -29,6 +29,10 @@ class ConversationService:
         role: str,
         content: str,
         timestamp: datetime = datetime.now(timezone.utc),
+        chat_params: Optional[dict[str, Any]] = None,
+        contextual_messages: Optional[list[ChatCompletionMessageParam]] = None,
+        document_ids: Optional[list[str]] = None,
+        thoughts: Optional[list[dict[str, Any]]] = None,
     ) -> ConversationMemory:
         """
         Save a single message to the conversation memory.
@@ -38,6 +42,10 @@ class ConversationService:
             role: The role of the message sender (user, assistant, system)
             content: The content of the message
             timestamp: Optional timestamp for the message (defaults to current time)
+            chat_params: Optional debug data for chat parameters
+            contextual_messages: Optional debug data for contextual messages
+            document_ids: Optional debug data for result document IDs
+            thoughts: Optional debug data for thoughts
 
         Returns:
             The saved ConversationMemory object
@@ -47,6 +55,10 @@ class ConversationService:
             message_role=role,
             message_content=content,
             message_timestamp=timestamp,
+            chat_params=chat_params,
+            contextual_messages=contextual_messages,
+            document_ids=document_ids,
+            thoughts=thoughts,
         )
         self.db_session.add(message)
         await self.db_session.commit()

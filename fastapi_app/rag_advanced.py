@@ -89,7 +89,7 @@ class AdvancedRAGChat(RAGChatBase):
         query_messages, query_text, filters = await self.generate_search_query(
             original_user_query=chat_params.original_user_query,
             past_messages=chat_params.past_messages,
-            query_response_token_limit=500,
+            query_response_token_limit=chat_params.response_token_limit,
             seed=chat_params.seed,
         )
         # Retrieve relevant rows from the database with the GPT optimized query
@@ -114,7 +114,7 @@ class AdvancedRAGChat(RAGChatBase):
             + "\n\nSources:\n"
             + content,
             past_messages=chat_params.past_messages,
-            max_tokens=self.chat_token_limit - chat_params.response_token_limit,
+            max_tokens=self.chat_token_limit,
             fallback_to_default=True,
         )
         thoughts = [

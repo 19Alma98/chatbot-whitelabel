@@ -1,12 +1,14 @@
 import json
 import logging
 from collections.abc import AsyncGenerator
+from typing import Any, Annotated
 from fastapi import UploadFile, File, Depends
 
 import fastapi
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from openai import APIError
+from openai.types.chat import ChatCompletionMessageParam
 from sqlalchemy import select, text
 
 from fastapi_app.api_models import (
@@ -28,7 +30,6 @@ from fastapi_app.dependencies import (
     get_async_sessionmaker,
 )
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from typing import Annotated
 from fastapi_app.postgres_models import Item
 from fastapi_app.rag_advanced import AdvancedRAGChat
 from fastapi_app.rag_simple import SimpleRAGChat
@@ -175,11 +176,21 @@ async def chat_handler(
             earlier_thoughts=thoughts,
         )
 
-        # Save the assistant's response
+        chat_params_dict = chat_params.model_dump() if chat_params else None
+        document_ids = [str(result.id) for result in results] if results else None
+        thoughts_dict = (
+            [thought.model_dump() for thought in thoughts] if thoughts else None
+        )
+
+        # Save the assistant's response with debug data
         await conversation_service.save_message(
             conversation_id=conversation_id,
             role="assistant",
             content=response.message.content,
+            chat_params=chat_params_dict,
+            contextual_messages=contextual_messages,
+            document_ids=document_ids,
+            thoughts=thoughts_dict,
         )
 
         return response
@@ -262,10 +273,17 @@ async def chat_stream_handler(
             chat_params
         )
 
+        document_ids = [str(result.id) for result in results]
+        thoughts_dict = [thought.model_dump() for thought in thoughts]
+
         async def save_streamed_response(
             stream: AsyncGenerator[RetrievalResponseDelta, None],
             session_maker: async_sessionmaker[AsyncSession],
             conv_id: str,
+            chat_params: dict[str, Any],
+            contextual_messages_data: list[ChatCompletionMessageParam],
+            document_ids_data: list[str],
+            thoughts_data: list[dict[str, Any]],
         ) -> AsyncGenerator[RetrievalResponseDelta, None]:
             """Wrapper to collect and save the streamed assistant response."""
             full_response = ""
@@ -283,6 +301,10 @@ async def chat_stream_handler(
                         conversation_id=conv_id,
                         role="assistant",
                         content=full_response,
+                        chat_params=chat_params,
+                        contextual_messages=contextual_messages_data,
+                        document_ids=document_ids_data,
+                        thoughts=thoughts_data,
                     )
 
         result = rag_flow.answer_stream(
@@ -292,7 +314,15 @@ async def chat_stream_handler(
             earlier_thoughts=thoughts,
         )
 
-        wrapped_result = save_streamed_response(result, sessionmaker, conversation_id)
+        wrapped_result = save_streamed_response(
+            result,
+            sessionmaker,
+            conversation_id,
+            chat_params.model_dump(),
+            contextual_messages,
+            document_ids,
+            thoughts_dict,
+        )
 
     except Exception as e:
         if isinstance(e, APIError) and e.code == "content_filter":
