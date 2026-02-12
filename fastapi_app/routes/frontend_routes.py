@@ -8,22 +8,22 @@ from starlette.routing import Mount, Route, Router
 parent_dir = Path(__file__).resolve().parent.parent.parent
 
 
-async def index(request: Request) -> FileResponse:
-    return FileResponse(parent_dir / "static/index.html")
+# async def index(request: Request) -> FileResponse:
+#     return FileResponse(parent_dir / "static/index.html")
 
 
-async def favicon(request: Request) -> FileResponse:
-    return FileResponse(parent_dir / "static/favicon.ico")
+# async def favicon(request: Request) -> FileResponse:
+#     return FileResponse(parent_dir / "static/favicon.ico")
 
 
 router = Router(
     routes=[
-        Route("/", endpoint=index),
-        Route("/favicon.ico", endpoint=favicon),
-        Mount(
-            "/assets",
-            app=StaticFiles(directory=parent_dir / "static/assets"),
-            name="static_assets",
-        ),
+        # Route("/", endpoint=index),
+        # Route("/favicon.ico", endpoint=favicon),
+        # Mount(
+        #     "/assets",
+        #     app=StaticFiles(directory=parent_dir / "static/assets"),
+        #     name="static_assets",
+        # ),
     ]
 )
